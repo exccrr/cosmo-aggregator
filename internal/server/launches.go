@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/exccrr/cosmo-aggregator/internal/cache"
 	"github.com/exccrr/cosmo-aggregator/internal/spacex"
 )
 
@@ -15,12 +17,24 @@ func SpaceXHandler(w http.ResponseWriter, r *http.Request) {
 		limit = 5
 	}
 
+	cacheKey := "spacex:launches:" + strconv.Itoa(limit)
+
+	// Проверяем кэш
+	if cached, err := cache.Get(cacheKey); err == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(cached))
+		return
+	}
+
 	launches, err := spacex.GetLatestLaunches(limit)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	jsonData, _ := json.Marshal(launches)
+	cache.Set(cacheKey, string(jsonData), 5*time.Minute)
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(launches)
+	w.Write(jsonData)
 }
