@@ -3,13 +3,23 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/exccrr/cosmo-aggregator/internal/cache"
 	"github.com/exccrr/cosmo-aggregator/internal/server"
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	cache.InitRedis("localhost:6379") // Redis
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found")
+	}
+
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+	cache.InitRedis(redisAddr)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
