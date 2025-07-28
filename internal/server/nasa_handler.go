@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -18,7 +19,7 @@ func MarsPhotosHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cacheKey := "nasa:mars:" + date
-	if cached, err := cache.Get(cacheKey); err == nil {
+	if cached, err := cache.Get(cacheKey); err == nil && r.URL.Query().Get("view") != "html" {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(cached))
 		return
@@ -42,6 +43,16 @@ func MarsPhotosHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(photos) > limit {
 		photos = photos[:limit]
+	}
+
+	if r.URL.Query().Get("view") == "html" {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprintf(w, "<h1>Mars Rover Photos (%s)</h1>", date)
+		for _, p := range photos {
+			fmt.Fprintf(w, `<div style="margin:10px"><img src="%s" width="300"><p>%s (%s)</p></div>`,
+				p.ImgSrc, p.Camera.Name, p.EarthDate)
+		}
+		return
 	}
 
 	jsonData, _ := json.Marshal(photos)
