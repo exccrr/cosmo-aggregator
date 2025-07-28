@@ -27,6 +27,7 @@ func main() {
 	})
 	mux.HandleFunc("/spacex/launches", server.SpaceXHandler)
 	mux.HandleFunc("/nasa/mars/photos", server.MarsPhotosHandler)
+	mux.HandleFunc("/nasa/mars/dates", server.MarsDatesHandler)
 
 	log.Println("Server started at :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
