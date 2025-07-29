@@ -33,6 +33,7 @@ func main() {
 	mux.HandleFunc("/ws/iss", server.ISSWebSocketHandler)
 	mux.HandleFunc("/iss/map", server.ISSMapHandler)
 	mux.HandleFunc("/nasa/asteroids", server.AsteroidsHandler)
+	mux.HandleFunc("/", server.FrontendHandler)
 
 	server.StartISSUpdater()
 

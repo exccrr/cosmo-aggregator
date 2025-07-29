@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/gorilla/websocket"
 )
+
+var lastISS *ISSLocation
 
 type issAPIResponse struct {
 	Timestamp   int64 `json:"timestamp"`
@@ -46,13 +49,23 @@ func ISSWebSocketHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("New ISS WebSocket client connected")
 
-	defer func() {
-		clientsMu.Lock()
-		delete(clients, conn)
-		clientsMu.Unlock()
-		conn.Close()
-		log.Println("ISS WebSocket client disconnected")
-	}()
+	if lastISS != nil {
+		data, _ := json.Marshal(lastISS)
+		conn.WriteMessage(websocket.TextMessage, data)
+	}
+
+	for {
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+	}
+
+	clientsMu.Lock()
+	delete(clients, conn)
+	clientsMu.Unlock()
+	conn.Close()
+	log.Println("ISS WebSocket client disconnected")
 }
 
 func StartISSUpdater() {
@@ -76,30 +89,39 @@ func StartISSUpdater() {
 }
 
 func fetchISSLocation() (*ISSLocation, error) {
-	resp, err := http.Get("http://api.open-notify.org/iss-now.json")
+	resp, err := http.Get("https://api.wheretheiss.at/v1/satellites/25544")
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	var apiResp issAPIResponse
+	var apiResp struct {
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+		Timestamp int64   `json:"timestamp"`
+	}
 	if err := json.Unmarshal(body, &apiResp); err != nil {
 		return nil, err
 	}
+	log.Printf("ISS API response: %s", body)
 
 	return &ISSLocation{
-		Latitude:  apiResp.ISSPosition.Latitude,
-		Longitude: apiResp.ISSPosition.Longitude,
+		Latitude:  fmt.Sprintf("%.6f", apiResp.Latitude),
+		Longitude: fmt.Sprintf("%.6f", apiResp.Longitude),
 		Timestamp: apiResp.Timestamp,
 	}, nil
+
 }
 
 func broadcastISS(loc *ISSLocation) {
-	data, _ := json.Marshal(loc)
+	lastISS = loc
 
+	data, _ := json.Marshal(loc)
 	clientsMu.Lock()
 	defer clientsMu.Unlock()
+
+	log.Printf("Sending ISS coords to %d clients", len(clients))
 	for conn := range clients {
 		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 			log.Println("WebSocket write error:", err)
@@ -119,12 +141,15 @@ func ISSMapHandler(w http.ResponseWriter, r *http.Request) {
         <meta charset="utf-8" />
         <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
         <style>
-            #map { height: 90vh; width: 100%; }
+            body { font-family: Arial, sans-serif; background: #0b0c10; color: #fff; }
+            #map { height: 80vh; width: 100%; margin-bottom: 10px; }
+            #info { padding: 10px; background: #1f2833; border-radius: 6px; }
         </style>
     </head>
     <body>
         <h1>ISS Location in Real Time</h1>
         <div id="map"></div>
+        <div id="info">Waiting for coordinates...</div>
 
         <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
         <script>
@@ -139,15 +164,33 @@ func ISSMapHandler(w http.ResponseWriter, r *http.Request) {
             });
 
             var marker = L.marker([0, 0], {icon: issIcon}).addTo(map);
+            var firstUpdate = true;
 
-            const ws = new WebSocket("ws://localhost:8080/ws/iss");
-            ws.onmessage = function(event) {
-                var data = JSON.parse(event.data);
-                var lat = parseFloat(data.latitude);
-                var lon = parseFloat(data.longitude);
-                marker.setLatLng([lat, lon]);
-                map.setView([lat, lon], map.getZoom());
-            };
+			const ws = new WebSocket("ws://localhost:8080/ws/iss");
+
+			ws.onmessage = function(event) {
+				var data = JSON.parse(event.data);
+				console.log("ISS data:", data);
+
+				var lat = parseFloat(data.latitude);
+				var lon = parseFloat(data.longitude);
+
+				marker.setLatLng([lat, lon]);
+
+				if (firstUpdate) {
+					map.setView([lat, lon], 4);
+					firstUpdate = false;
+				}
+
+				// map.setView([lat, lon], 4);
+
+				var ts = new Date(data.timestamp * 1000).toLocaleTimeString();
+				document.getElementById("info").innerText =
+					"Latitude: " + lat.toFixed(4) +
+					" | Longitude: " + lon.toFixed(4) +
+					" | Time: " + ts;
+			};
+
         </script>
     </body>
     </html>
