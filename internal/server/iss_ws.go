@@ -100,9 +100,6 @@ func broadcastISS(loc *ISSLocation) {
 
 	clientsMu.Lock()
 	defer clientsMu.Unlock()
-
-	log.Printf("Broadcasting ISS: %+v", loc)
-
 	for conn := range clients {
 		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 			log.Println("WebSocket write error:", err)
