@@ -30,6 +30,10 @@ func main() {
 	mux.HandleFunc("/nasa/mars/dates", server.MarsDatesHandler)
 	mux.HandleFunc("/nasa/apod", server.APODHandler)
 	mux.HandleFunc("/nasa/apod/dates", server.APODDatesHandler)
+	mux.HandleFunc("/ws/iss", server.ISSWebSocketHandler)
+	mux.HandleFunc("/iss/map", server.ISSMapHandler)
+
+	server.StartISSUpdater()
 
 	log.Println("Server started at :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
