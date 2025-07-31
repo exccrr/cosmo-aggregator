@@ -20,7 +20,7 @@ It includes a simple web frontend and REST API with optional HTML views.
 
 ## 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/cosmo-aggregator.git
+git clone https://github.com/exccrr/cosmo-aggregator.git
 cd cosmo-aggregator
 ```
 ## 2. Install dependencies:
@@ -50,7 +50,7 @@ Server will start at http://localhost:8080
 
 ### _**NASA APOD**:_
 - ```JSON:``` /nasa/apod?date=YYYY-MM-DD
-- ```HTML:``` /nasa/apod?date=YYYY-MM-DD&view=html```
+- ```HTML:``` /nasa/apod?date=YYYY-MM-DD&view=html
 
 ---
 
